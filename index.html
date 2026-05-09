@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MBA Mentor Connect</title>
 
-<!-- Firebase compat SDK — no ES module scoping issues -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
@@ -285,11 +284,9 @@ body {
 
 <div class="toast" id="toast"></div>
 
-<!-- All JS in a regular script tag — no module scoping, all functions are global -->
 <script>
 // ============================================================
-// 🔴 REPLACE THIS BLOCK WITH YOUR FIREBASE CONFIG
-// Firebase Console → Project Settings → Your Apps → Web App
+// 🔴 FIREBASE CONFIG
 // ============================================================
 var firebaseConfig = {
   apiKey:            "AIzaSyCz-PsGMO3C8UjL3wF7SnQi2aRRf7HBDK4",
@@ -300,7 +297,6 @@ var firebaseConfig = {
   messagingSenderId: "771371972635",
   appId:             "1:771371972635:web:207c8b873bb7438a74e0be"
 };
-// ============================================================
 
 firebase.initializeApp(firebaseConfig);
 var db = firebase.database();
@@ -418,7 +414,6 @@ function listenToColleges() {
     render();
     updateStats();
   }, function(err) {
-    // Firebase error — show colleges from DEFAULT_COLLEGES so the page isn't blank
     document.getElementById('collegeGrid').innerHTML =
       '<div class="empty-state">⚠️ Could not connect to database. Please check your Firebase config.<br><small style="opacity:.6">' + err.message + '</small></div>';
   });
@@ -470,7 +465,7 @@ function renderBody(c) {
               '<div class="mentor-phone">' + formatPhone(m.phone) + '</div>' +
             '</div>' +
             '<a class="wa-btn" href="' + waLink(m.phone, m.name) + '" target="_blank">💬 WhatsApp</a>' +
-            '<button class="btn-danger" onclick="removeMentor(\'' + c.id + '\',\'' + m._key + '\')">✕</button>' +
+            '<button class="btn-danger" title="Request mentor removal" onclick="sendRemovalRequest(\'' + c.id + '\', \'' + c.name + '\', \'' + m.name + '\', \'' + m._key + '\')">✕</button>' +
           '</div>'
         );
       }).join('');
@@ -490,7 +485,7 @@ function renderBody(c) {
   );
 }
 
-// ── Actions — all global so onclick="" works ─────────────────
+// ── Actions ─────────────────────────────────────────────────
 function toggle(id) {
   expandedId = expandedId === id ? null : id;
   render();
@@ -524,11 +519,37 @@ function addMentor(collegeId) {
     .catch(function(e) { showToast('Save failed: ' + e.message, 'error'); });
 }
 
-function removeMentor(collegeId, mentorKey) {
-  if (!confirm('Remove this mentor?')) return;
-  db.ref('colleges/' + collegeId + '/mentors/' + mentorKey).remove()
-    .then(function() { expandedId = collegeId; showToast('Mentor removed'); })
-    .catch(function(e) { showToast('Error: ' + e.message, 'error'); });
+/**
+ * Sends a mentor removal request to the 'requests' node.
+ * Admins can review these requests and perform manual deletions.
+ */
+function sendRemovalRequest(collegeId, collegeName, mentorName, mentorKey) {
+  var reason = prompt("Reason for removal request (e.g., incorrect details, mentor left, etc.):");
+  
+  if (reason === null) return;
+  if (reason.trim() === "") {
+    showToast("Please provide a reason for the request", "error");
+    return;
+  }
+
+  var requestData = {
+    type: "DELETION_REQUEST",
+    collegeId: collegeId,
+    collegeName: collegeName,
+    mentorName: mentorName,
+    mentorKey: mentorKey,
+    reason: reason,
+    timestamp: Date.now(),
+    status: "pending"
+  };
+
+  db.ref('requests').push(requestData)
+    .then(function() {
+      showToast("Request sent to admin for review. Thank you!");
+    })
+    .catch(function(e) {
+      showToast("Failed to send request: " + e.message, "error");
+    });
 }
 
 function addCollege() {
